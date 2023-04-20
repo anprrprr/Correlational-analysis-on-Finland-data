@@ -1,0 +1,218 @@
+---
+title: "Mystic_mops_project3"
+author: "Anna"
+date: "23 04 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(haven)
+ESS <- read_sav("C:/Users/Anna/Documents/R/ESS9_Fin.sav")
+library(ggplot2)
+library(moments)
+library(sjPlot)
+library(dplyr)
+library(sjlabelled)
+ESS3 <- c("netustm", "agea", "eduyrs", "happy", "eisced")
+ESS3 <- ESS[ESS3]
+```
+Team members & contributions
+
+
+Topic:Internet use based on respondents’ characteristics (age, education, happiness).
+
+
+Country: Finland
+
+# Variables choice & hypotheses
+## Background & hypotheses
+
+## Exploring the variables
+Let's first check the types of variables and how they are stored in R.
+```{r first look at the variables}
+glimpse(ESS3)
+
+class(ESS3$netustm)
+class(ESS3$agea)
+class(ESS3$eduyrs)
+class(ESS3$happy)
+class(ESS3$eisced)
+```
+We can see that all variables are stored as vectors. For easier analysis let's convert the internet use `netustm`, age `agea`, education years `eduyrs` and happiness level `happy` into numeric variables; recode education level `eisced` into more convenient categories; and rename the new variables.
+
+```{r recoding variables}
+ESS3$netusemin <- as.numeric(ESS3$netustm)
+ESS3$age <- as.numeric(ESS3$agea)
+ESS3$eduyrs_n <- as.numeric(ESS3$eduyrs)
+ESS3$happylvl <- as.numeric(as.character(ESS3$happy))
+
+class(ESS3$netusemin)
+class(ESS3$age)
+class(ESS3$eduyrs_n)
+class(ESS3$happylvl)
+
+ESS3$edlvl <- as.numeric(as.character(ESS3$eisced))
+ESS3$edlvl[ESS3$edlvl == "0" | ESS3$edlvl == "1" | 
+                 ESS3$edlvl == "2"] <- "lower secondary or less"
+ESS3$edlvl[ESS3$edlvl == "3" | ESS3$edlvl == "4"] <- "upper secondary"
+ESS3$edlvl[ESS3$edlvl == "5"] <- "advanced vocational"
+ESS3$edlvl[ESS3$edlvl == "6"] <- "BA"
+ESS3$edlvl[ESS3$edlvl == "7"] <- "MA or higher"
+
+ESS3$edlvl <- factor(ESS3$edlvl, ordered = TRUE, 
+                               levels = c("lower secondary or less", 
+                                          "upper secondary", 
+                                          "advanced vocational", 
+                                          "BA", "MA or higher"))
+class(ESS3$edlvl)
+```
+# Plots & descriptives for variables
+Now that we have recoded and renamed each variable (again, for convenience), we can build plots to see how they are distributed. 
+## Numeric variables
+```{r histograms for numeric variables, warning=FALSE}
+ggplot(ESS3, aes(x=netusemin)) + 
+  geom_histogram(bins=20, color="black", fill="#fdbcb4")+
+  geom_vline(aes(xintercept=median(netustm)), color="red", linetype="dashed", size=1)+
+  theme_minimal()
+
+ggplot(ESS3, aes(x=age)) + 
+  geom_histogram(bins=25,color="black", fill="#87CEEB")+
+  geom_vline(aes(xintercept=median(agea)), color="red", linetype="dashed", size=1)+
+  theme_minimal()
+
+ggplot(ESS3, aes(x=eduyrs_n)) + 
+  geom_histogram(bins = 50,color="black", fill="#87CEEB")+
+  geom_vline(aes(xintercept=median(eduyrs)), color="red", linetype="dashed", size=1)+
+  theme_minimal()
+
+ggplot(ESS3, aes(x=happylvl)) + 
+  geom_histogram(breaks = seq(0, 11, by=1),color="black", fill="#87CEEB")+
+  geom_vline(aes(xintercept=median(happy)), color="red", linetype="dashed", size=1)+
+  theme_minimal()
+
+```
+Let's start with histograms for numeric variables. We need to assess their normality before performing correlation tests, as based on that (and other assumptions) we will choose the appropriate method:
+
+- `netusemin` - internet usage per day in minutes, outcome variable, ratio:
+ - here we see that the variable is severely right-skewed, so most people tend to spend less than 400-500 min a day on the internet; the distribution is unimodal and somewhat bell-shaped; it is far from normal. 
+
+- `age` - calculated age of respondents, full years, ratio:
+ - this variable is also unimodal, but we cannot say that it is bell-shaped or normal; the researchers seemed to collect respondents of different age groups, so there is a similar amount of most ages.
+
+- `eduyrs_n` - sum of years spent on education, full years, ratio:
+ - this distribution is unimodal and bell-shaped, but is right-skewed because of several outliers (people who spent over 30 years on education); again, it is not normal.
+
+- `happylvl` - self-assessed level of happiness of respondents, quasi-interval:
+ - this variable's distribution is left-skewed, unimodal and close to bell-shaped; most respondents seem to indicate quite high levels of happiness (7 and higher).
+
+## Categorical variables
+```{r plot for categorical variable}
+ESS3_2=ESS3%>%
+filter(! is.na(edlvl))
+ggplot(ESS3_2, aes(x=edlvl, fill=edlvl)) + 
+  geom_bar()+
+  theme(axis.text.x = element_text(angle = 90))
+```
+- `edlvl` - education level of the respondent, ordinal variable with 5 levels:
+ - the biggest category is _upper secondary education_ (almost 600); second biggest - _lower secondary or less_ (~350); the higher levels of education contain about 300 respondents each; so we can say that Finnish people tend to pursue voctional or higher university education.
+ 
+## Descriptives of variables
+Now we create a data frame only with our new variables and label them. Then we create a table with value descriptives (namely range of each variable).
+```{r descriptives for variables}
+ESS3_1 <- c("netusemin", "age", "eduyrs_n", "happylvl", "edlvl")
+ESS3_1 <- ESS3[ESS3_1]
+ESS3_1
+
+labs <- c("Internet use on a typical day, in minutes",
+          "Age of respondent, calculated",
+          "Years of full-time education completed",
+          "Happiness level, scale 0-10",
+          "Education level")
+
+ESS3_1 <- set_label(ESS3_1, label = labs)
+view_df(ESS3_1[1:5], show.prc = F, verbose = F)
+```
+We can see that for education level there are categories listed. Happiness level's range corresponds to the scale that was used in the survey. Internet use is 0-960, so we identified its type (ratio) correctly. Years of education and age do not start from0, however, we think it is still suitable to call them ratio variables as technically there is an absolute 0 for them.
+
+# Correlation
+## Linearity & homoskedasticity
+
+```{r checking linearity, warning=FALSE}
+ggplot(ESS3, aes(x = age, y = netusemin)) +
+  geom_point(alpha=0.5, position = "jitter") +
+  geom_smooth(method = lm)
+
+ggplot(ESS3, aes(x = eduyrs_n, y= netusemin)) +
+  geom_point(alpha=0.5, position = "jitter")+
+  geom_smooth(method=lm, color = "red")
+
+ggplot(ESS3, aes(x = happylvl, y= netusemin)) +
+  geom_point(alpha=0.5, position = "jitter")+
+  geom_smooth(method=lm, color = "green")
+```
+
+```{r correlations with continuous variables, warning=FALSE}
+cor.test(ESS3_1$age, ESS3_1$netusemin, method = "spearman")
+cor.test(ESS3_1$eduyrs_n, ESS3_1$netusemin, method = "spearman")
+cor.test(ESS3_1$happylvl, ESS3_1$netusemin, method = "spearman")
+
+cor.test(ESS3_1$netusemin, ESS3_1$age, method = "spearman")
+cor.test(ESS3_1$netusemin, ESS3_1$eduyrs_n, method = "spearman")
+cor.test(ESS3_1$netusemin, ESS3_1$happylvl, method = "spearman")
+
+```
+
+```{r correlation matrix}
+tab_corr(ESS3_1[, 1:4])
+```
+
+
+```{r boxplot for categorical predictor, warning=FALSE}
+ggplot(ESS3_2, aes(x=edlvl, y = netusemin)) +
+  geom_boxplot()
+```
+
+# Regression
+
+```{r model of `netusemin` ~ `age`}
+model1 <- lm(netusemin ~ age, data = ESS3_1)
+summary(model1)
+tab_model(model1, show.ci = F)
+```
+
+```{r model of `netusemin` ~ `age + eduyrs_n`}
+model2 <- lm(netusemin ~ age + eduyrs_n, data = ESS3_1)
+summary(model2)
+tab_model(model2, show.ci = F)
+```
+
+```{r model of `netusemin` ~ `age + eduyrs_n + happylvl`}
+model3 <- lm(netusemin ~ age + eduyrs_n + happylvl, data = ESS3_1)
+summary(model3)
+tab_model(model3, show.ci = F)
+```
+
+```{r model of `netusemin` ~ `age + eduyrs_n + happylvl + edlvl`}
+model4 <- lm(netusemin ~ age + eduyrs_n + happylvl + edlvl, data = ESS3_1)
+summary(model4)
+tab_model(model4, show.ci = F)
+```
+
+```{r RMSE}
+mean(residuals(model4))
+ 
+# Compute RMSE
+sqrt(sum(residuals(model4)^2) / df.residual(model4))
+```
+
+```{r 8}
+# 7
+# Visualize the relationships using plot_model from sjPlot library.
+library(sjPlot)
+
+plot_model(model4, type = "pred")
+```
+
+
+
